@@ -1,0 +1,185 @@
+// 服装店多店后台管理系统 - 数据模型
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// 门店（分店）
+model Store {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  address   String?
+  phone     String?
+  status    String   @default("ACTIVE") // ACTIVE | DISABLED
+  createdAt DateTime @default(now())
+
+  users       User[]
+  batches     StockBatch[]
+  stocks      Stock[]
+  orders      Order[]
+  returns     SalesReturn[]
+}
+
+/// 账号
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  password     String
+  name         String
+  role         String   @default("CLERK") // ADMIN | MANAGER | CLERK
+  storeId      Int?
+  store        Store?   @relation(fields: [storeId], references: [id])
+  /// 额外授权（JSON 数组），在角色默认权限之上叠加
+  permissions  String   @default("[]")
+  status       String   @default("ACTIVE") // ACTIVE | DISABLED
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  batches StockBatch[]
+  orders  Order[]
+  returns SalesReturn[]
+}
+
+/// 商品类别（依据《类似商品和服务区分表》尼斯分类，服装相关大类）
+model Category {
+  id          Int      @id @default(autoincrement())
+  niceClass   Int      // 大类：25 服装鞋帽 / 18 皮革箱包 ...
+  groupCode   String   // 类似群号，如 2501
+  groupName   String   // 类似群名称，如 衣物
+  name        String   // 小类商品名称，如 裤子
+  sort        Int      @default(0)
+
+  products Product[]
+}
+
+/// 商品
+model Product {
+  id         Int      @id @default(autoincrement())
+  sku        String   @unique // 货号（给人看的业务编码）
+  barcode    String   @unique // 机读条码：EAN-13（13 位数字，含校验位），扫码枪扫这个
+  name       String   // 品名
+  image      String?
+  categoryId Int?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  /// 档案预设成本价（进货价）：入库时作为默认进货价带入，允许现场改
+  costPrice  Float?
+  /// 档案销售价：入库不再填售价，统一取这个值写入库存/批次
+  salePrice  Float?
+  remark     String?
+  status     String   @default("ACTIVE")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  batches   StockBatch[]
+  stocks    Stock[]
+  orderItems OrderItem[]
+  returns   SalesReturn[]
+}
+
+/// 入库批次（每次入库一条，成本采用移动加权平均）
+model StockBatch {
+  id        Int      @id @default(autoincrement())
+  storeId   Int
+  store     Store    @relation(fields: [storeId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  costPrice Float    // 进货价
+  salePrice Float    // 销售价
+  quantity  Int      // 入库数量
+  type      String   @default("MANUAL") // SCAN | MANUAL
+  operatorId Int?
+  operator  User?    @relation(fields: [operatorId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+/// 门店维度库存汇总
+model Stock {
+  id        Int      @id @default(autoincrement())
+  storeId   Int
+  store     Store    @relation(fields: [storeId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int      @default(0)  // 剩余件数
+  avgCost   Float    @default(0)  // 移动加权平均成本
+  salePrice Float    @default(0)  // 当前销售价
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, productId])
+}
+
+/// 销售单
+model Order {
+  id          Int      @id @default(autoincrement())
+  orderNo     String   @unique
+  storeId     Int
+  store       Store    @relation(fields: [storeId], references: [id])
+  totalAmount Float    @default(0) // 营业额
+  totalCost   Float    @default(0) // 成本
+  totalProfit Float    @default(0) // 毛利
+  itemCount   Int      @default(0) // 件数（退货单为负）
+  /// SALE=正常销售单 / RETURN=未关联订单的退货冲减单（金额为负）
+  type        String   @default("SALE")
+  /// 已退货金额与件数（仅 SALE 单累计，退货时从 totalAmount/totalCost 里直接扣掉）
+  returnAmount Float   @default(0)
+  returnCount  Int     @default(0)
+  operatorId  Int?
+  operator    User?    @relation(fields: [operatorId], references: [id])
+  remark      String?
+  createdAt   DateTime @default(now())
+
+  items   OrderItem[]
+  returns SalesReturn[]
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  sku       String
+  name      String
+  quantity  Int
+  unitPrice Float
+  /// 下单时的档案销售价快照：与 unitPrice 对比得出这一件是优惠还是加价
+  /// 历史订单没有这个值（NULL），一律视为「未调整」
+  listPrice Float?
+  /// 这件商品已退多少件（明细里显示「已退 n 件」）
+  returnedQty Int   @default(0)
+  unitCost  Float
+  subtotal  Float
+  profit    Float
+}
+
+/// 退货单（一次退一件商品，可多件同款）
+model SalesReturn {
+  id           Int      @id @default(autoincrement())
+  returnNo     String   @unique
+  storeId      Int
+  store        Store    @relation(fields: [storeId], references: [id])
+  /// 关联的原销售单（可空：没关联就走负数冲减单）
+  orderId      Int?
+  order        Order?   @relation(fields: [orderId], references: [id])
+  productId    Int
+  product      Product  @relation(fields: [productId], references: [id])
+  sku          String
+  name         String
+  quantity     Int
+  unitPrice    Float
+  unitCost     Float
+  refundAmount Float
+  refundCost   Float
+  refundProfit Float
+  /// 是否关联到了原销售单
+  linked       Boolean  @default(false)
+  /// 未关联时生成的负数冲减单 id，便于追溯
+  offsetOrderId Int?
+  operatorId   Int?
+  operator     User?    @relation(fields: [operatorId], references: [id])
+  remark       String?
+  createdAt    DateTime @default(now())
+}

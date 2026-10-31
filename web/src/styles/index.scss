@@ -1,0 +1,771 @@
+:root {
+  --brand: #6c5ce7;
+  --brand-2: #a29bfe;
+  --brand-dark: #2d2a5e;
+  --bg: #f5f6fa;
+  --card-radius: 14px;
+  --shadow: 0 6px 22px rgba(64, 60, 130, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue',
+    Arial, sans-serif;
+  background: var(--bg);
+  color: #2c2c3a;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Element Plus 主题覆盖 ---------- */
+.el-button--primary {
+  --el-button-bg-color: var(--brand);
+  --el-button-border-color: var(--brand);
+  --el-button-hover-bg-color: #7d6ef0;
+  --el-button-hover-border-color: #7d6ef0;
+  --el-button-active-bg-color: #5a4bd6;
+  --el-button-active-border-color: #5a4bd6;
+}
+
+.el-menu {
+  border-right: none !important;
+}
+
+.el-menu-item.is-active {
+  background: linear-gradient(90deg, rgba(162, 155, 254, 0.28), rgba(162, 155, 254, 0.04)) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.el-menu-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12%;
+  height: 76%;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: #fff;
+}
+
+.el-card {
+  border-radius: var(--card-radius) !important;
+  box-shadow: var(--shadow) !important;
+  border: none !important;
+}
+
+.el-table {
+  --el-table-header-bg-color: #f7f7fc;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600;
+  color: #4a4a5e;
+}
+
+.el-dialog {
+  border-radius: 16px !important;
+  /* 弹窗高度封顶：内容再多也只长到屏幕内，超出部分在弹窗内部滚动 */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--el-dialog-margin-top, 15vh) - 60px);
+}
+
+/* 标题栏与底部按钮固定，中间内容区滚动 */
+.el-dialog > .el-dialog__header,
+.el-dialog > .el-dialog__footer {
+  flex: 0 0 auto;
+}
+
+.el-dialog > .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 弹窗内滚动条细化，避免压住内容 */
+.el-dialog > .el-dialog__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.el-dialog > .el-dialog__body::-webkit-scrollbar-thumb {
+  background: rgba(35, 35, 58, 0.18);
+  border-radius: 3px;
+}
+
+.el-dialog > .el-dialog__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.el-tag {
+  border-radius: 6px;
+}
+
+/* ---------- 通用 ---------- */
+/* 表格分页器：右对齐，窄屏自动换行 */
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.page {
+  padding: 4px;
+}
+
+.page-card {
+  background: #fff;
+  border-radius: var(--card-radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+
+/* ---------- 表格高度跟随视口 ---------- */
+/* 列表页整页 = 视口高度 - 顶部导航，窗口缩放时自动跟着弹缩：
+   高度链路  #app / .content > .page.fill > .page-card > .table-fill > .el-table(height:100%)
+   每一层都必须 min-height:0，否则 flex 子项会被内容顶开、表格又会无限长 */
+.page.fill {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page.fill > .page-card {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+/* 标题栏、分页器等固定高度，不参与拉伸也不被压缩 */
+.page.fill > .page-card > * {
+  flex: 0 0 auto;
+}
+
+/* 表格容器：吃掉卡片剩余高度，超出部分在表格内部滚动（表头吸顶） */
+.page.fill > .page-card > .table-fill {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 入库页是「卡片 > 标签页 > 表格」，标签页同样要吃掉剩余高度 */
+.page.fill > .page-card > .el-tabs {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-fill {
+  margin-top: 14px;
+}
+
+/* 多列布局（销售记账）：行与列同样要撑满，卡片才能在列内伸缩。
+   整条链必须 min-width:0 —— flex 子项默认 min-width:auto，
+   否则购物车表格的总列宽会把左列撑破、横向盖到结算台上 */
+/* 左卡片与右结算台必须等高：卡片默认带 16px 下外边距，被 flex 拉伸后
+   会从可用高度里扣掉，底部比没有 margin 的结算台短一截 */
+.page.fill.sales-page .page-card {
+  margin-bottom: 0;
+}
+
+.page.fill > .el-row {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.page.fill > .el-row > .el-col {
+  height: 100%;
+  display: flex;
+  min-width: 0;
+}
+
+.page.fill > .el-row > .el-col > .page-card,
+.page.fill > .el-row > .el-col > .cart-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page.fill > .el-row > .el-col > .page-card > * {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.page.fill > .el-row > .el-col > .page-card > .table-fill {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 结算台：内部元素固定高度不被压缩，内容超出时在面板内滚动 */
+.page.fill > .el-row > .el-col > .cart-panel {
+  overflow-y: auto;
+}
+
+.page.fill > .el-row > .el-col > .cart-panel > * {
+  flex: 0 0 auto;
+}
+
+/* 窄屏（<1200px，与 el-col 的 lg 断点一致）：两列堆叠，整页在内容区内滚动 */
+@media (max-width: 1199.98px) {
+  .page.fill.sales-page {
+    height: auto;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  .page.fill.sales-page > .el-row {
+    flex: 0 0 auto;
+  }
+
+  .page.fill.sales-page > .el-row > .el-col {
+    height: auto;
+  }
+
+  .page.fill.sales-page > .el-row > .el-col > .page-card,
+  .page.fill.sales-page > .el-row > .el-col > .cart-panel {
+    flex: 0 0 auto;
+    /* col 主轴是水平的，basis auto 会按内容宽度撑开，必须显式收回 100% */
+    width: 100%;
+  }
+
+  .page.fill.sales-page > .el-row > .el-col > .page-card > .table-fill {
+    flex: 0 0 auto;
+    height: 420px;
+  }
+
+  /* 堆叠时两卡上下排列，需要留出卡片之间的间距 */
+  .page.fill.sales-page .page-card {
+    margin-bottom: 16px;
+  }
+}
+
+/* ---------- 扫码枪输入区（销售记账 / 货品入库 共用） ---------- */
+/* 整行加大、品牌色高亮，聚焦或鼠标移入时更醒目（收银主入口，要一眼看到） */
+.gun-box {
+  margin-top: 12px;
+  padding: 3px;
+  border-radius: 14px;
+  cursor: text;
+  background: rgba(108, 92, 231, 0.07);
+  transition: background 0.18s, box-shadow 0.18s;
+}
+
+.gun-box.active {
+  background: rgba(108, 92, 231, 0.16);
+  box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.45);
+}
+
+.gun-box .el-input__wrapper {
+  height: 54px;
+  border-radius: 11px;
+}
+
+.gun-box .el-input__inner {
+  font-size: 17px;
+}
+
+.gun-box .el-input__prefix-inner {
+  font-size: 22px;
+  color: var(--brand);
+  margin-right: 4px;
+}
+
+.gun-box .el-input-group__append {
+  padding: 0 14px;
+  color: inherit;
+}
+
+/* 右侧状态灯：绿点=光标在框里可以直接扫，灰点=需要点一下激活 */
+.gun-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #8a8aa0;
+  white-space: nowrap;
+}
+
+.gun-state .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c0c4cc;
+}
+
+.gun-box.active .gun-state {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.gun-box.active .gun-state .dot {
+  background: #67c23a;
+  box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.22);
+}
+
+/* 价格调整（优惠 / 加价）文字配色：销售记账、销售记录共用 */
+.diff-down {
+  color: #00b894;
+  font-weight: 700;
+}
+
+.diff-up {
+  color: #d63031;
+  font-weight: 700;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 2px;
+  color: #23233a;
+}
+
+.page-sub {
+  color: #8a8aa0;
+  font-size: 13px;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flex {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.muted {
+  color: #8a8aa0;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+/* 管理员可见 6 张卡（毛利之外还看订单/售出），固定 3 列两行，避免 auto-fit 排成 5+1 的孤行 */
+.stat-grid.six {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 1180px) {
+  .stat-grid.six {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .stat-grid.six {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  padding: 18px 20px;
+  color: #fff;
+  box-shadow: var(--shadow);
+  min-height: 116px;
+}
+
+.stat-card .label {
+  font-size: 13px;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-card .value {
+  font-size: 30px;
+  font-weight: 800;
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+.stat-card .foot {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.92;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 营业额卡片里的退货提示：浅色字 + 小圆点，避免和主数字抢眼 */
+.stat-card .ret-line {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stat-card .ret-line::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  flex: 0 0 auto;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  right: -30px;
+  top: -30px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  right: 24px;
+  bottom: -40px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 卡片配色：五个主色互不相同；毛利避开绿/红，防止与涨跌文字撞色 */
+.grad-1 {
+  background: linear-gradient(135deg, #6c5ce7, #8e7bff); /* 今日营业额 · 紫 */
+}
+.grad-2 {
+  background: linear-gradient(135deg, #c9861c, #f0b429); /* 今日毛利 · 金 */
+}
+.grad-3 {
+  background: linear-gradient(135deg, #0984e3, #4aa8fd); /* 今日订单 · 蓝（店长视角替补毛利位） */
+}
+.grad-4 {
+  background: linear-gradient(135deg, #e17055, #ff9a76); /* 本月营业额 · 橙 */
+}
+.grad-5 {
+  background: linear-gradient(135deg, #0e7490, #22a7c2); /* 本月毛利 · 青蓝 */
+}
+.grad-6 {
+  background: linear-gradient(135deg, #2d3436, #636e72); /* 本月售出 · 石板灰（店长视角替补毛利位） */
+}
+
+.trend-up {
+  color: #d63031;
+  font-weight: 700;
+}
+.trend-down {
+  color: #00b894;
+  font-weight: 700;
+}
+
+/* 彩色卡片内的涨跌文字统一白色胶囊：只靠 ↑↓ 箭头区分方向，不再用红绿 */
+.stat-card .trend-up,
+.stat-card .trend-down {
+  color: #fff;
+  font-weight: 700;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  white-space: nowrap;
+}
+
+/* 同一行内的卡片等高：列拉伸 + 卡片撑满；标题行统一高度 */
+.equal-row {
+  align-items: stretch;
+}
+
+.equal-row > .el-col {
+  display: flex;
+  /* 关键：flex 子项默认 min-width:auto，表格的最小列宽会把整行撑破、溢出到页面外。
+     置 0 后卡片宽度锁定在栅格上，超出内容由 el-table 自己横向滚动吸收。 */
+  min-width: 0;
+}
+
+.equal-row > .el-col > .page-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-bottom: 16px;
+}
+
+.card-head {
+  min-height: 32px;
+  margin-bottom: 12px;
+}
+
+/* 表格操作列：按钮紧凑排列、强制不换行 */
+.el-table .col-ops .cell {
+  /* 用 flex 排列，避免 inline 元素的基线/空白间隙导致按钮视觉错位 */
+  display: flex;
+  align-items: center;
+  /* 表头「操作」与按钮组一起居中 */
+  justify-content: center;
+  gap: 2px;
+  white-space: nowrap;
+  /* 默认 padding 是 0 12px，操作列收紧一点能给按钮多留 16px */
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.el-table .col-ops .cell .el-button {
+  margin-left: 0;
+  flex: 0 0 auto;
+}
+
+.el-table .col-ops .cell .el-button.is-link {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.login-bg {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 20% 20%, #8e7bff 0%, #6c5ce7 35%, #2d2a5e 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-bg::before {
+  content: '';
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  right: -120px;
+  top: -160px;
+}
+
+.login-bg::after {
+  content: '';
+  position: absolute;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  left: -100px;
+  bottom: -120px;
+}
+
+.login-panel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 900px;
+  max-width: 92vw;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(20, 16, 60, 0.35);
+}
+
+.login-left {
+  flex: 1.05;
+  padding: 48px 44px;
+  color: #fff;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+  backdrop-filter: blur(6px);
+}
+
+.login-right {
+  width: 380px;
+  background: #fff;
+  padding: 44px 38px;
+}
+
+.sidebar-logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-logo .dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #fff, #c9c2ff);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.app-header {
+  height: 64px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(64, 60, 130, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+}
+
+.cart-panel {
+  background: #fff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.cart-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.cart-item:last-child {
+  border-bottom: none;
+}
+
+.scan-box {
+  width: 100%;
+  height: 260px;
+  background: #1e1e2d;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.scan-box video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scan-line {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  top: 50%;
+  background: linear-gradient(90deg, transparent, #00e676, transparent);
+  box-shadow: 0 0 12px #00e676;
+  animation: scanmove 1.8s infinite ease-in-out;
+}
+
+@keyframes scanmove {
+  0% {
+    top: 20%;
+  }
+  50% {
+    top: 80%;
+  }
+  100% {
+    top: 20%;
+  }
+}
+
+.product-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #f0f0f7;
+}
+
+/* ---------- 标签打印 ---------- */
+.label-sheet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3mm;
+}
+
+.print-area {
+  background: #fff;
+  border: 1px solid #ececf6;
+  border-radius: 10px;
+  padding: 4mm;
+  max-height: 58vh;
+  overflow: auto;
+}
+
+@media print {
+  @page {
+    margin: 8mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    padding: 0;
+  }
+
+  /* 打印时解除弹窗高度封顶与滚动，否则只会打出可见的那一屏 */
+  .el-dialog,
+  .el-dialog__body {
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+}
