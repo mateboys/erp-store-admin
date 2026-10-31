@@ -3,6 +3,8 @@
 前端 **Vue3 + Pinia + Vite + ElementPlus + Axios + ECharts**（纯 JavaScript，无 TS）
 后端 **NestJS + Prisma + SQLite**（可一键切换 MySQL）
 
+仓库地址：<https://github.com/mateboys/erp-store-admin>
+
 ---
 
 ## 一、快速启动
