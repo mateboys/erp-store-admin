@@ -80,19 +80,34 @@ model Product {
   returns   SalesReturn[]
 }
 
-/// 入库批次（每次入库一条，成本采用移动加权平均）
+/// 出入库流水（一次入库或一次出库各一条）
+/// 入库 type：SCAN（扫码枪/拍照）| MANUAL（手动）| TRANSFER（调拔调入）
+/// 出库 type：LOSS（丢失/破损）| SUPPLIER（退供应商）| TRANSFER（调拔调出）
 model StockBatch {
   id        Int      @id @default(autoincrement())
   storeId   Int
   store     Store    @relation(fields: [storeId], references: [id])
   productId Int
   product   Product  @relation(fields: [productId], references: [id])
-  costPrice Float    // 进货价
+  costPrice Float    // 进货价（出库时为该批结转成本，退供应商为 0）
   salePrice Float    // 销售价
-  quantity  Int      // 入库数量
-  type      String   @default("MANUAL") // SCAN | MANUAL
+  quantity  Int      // 出入库数量（出库为正数，方向看 direction）
+  /// 方向：IN=入库 OUT=出库
+  direction String   @default("IN")
+  type      String   @default("MANUAL") // SCAN | MANUAL | TRANSFER | LOSS | SUPPLIER
+  /// 出库结转成本合计（调拔时为随货转移的成本；丢失/破损与退供应商为 0）
+  totalCost Float    @default(0)
+  /// 丢失/破损的赔偿金额：按**售价** × 件数计算（员工照价赔，不暴露成本）
+  compensate Float   @default(0)
+  /// 调拔时的对方门店 id（出库=调入方；入库=调出方），用于互查与来源说明
+  relatedStoreId Int?
+  /// 调拔来源/去向门店名快照（如「XX店调入」），避免门店改名后历史记录失真
+  relatedStoreName String?
+  /// 丢失/破损时的责任人，用于后续追偿
+  liablePerson String?
   operatorId Int?
   operator  User?    @relation(fields: [operatorId], references: [id])
+  remark     String?
   createdAt DateTime @default(now())
 }
 

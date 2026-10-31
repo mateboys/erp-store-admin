@@ -72,6 +72,21 @@ export class ProductsController {
       agg.forEach((a: any) => stockMap.set(a.productId, { quantity: a._sum.quantity || 0 }));
     }
 
+    /**
+     * 跨门店总库存：与门店筛选无关。
+     * 前端用它判断「这个商品还能不能删」——如果只看当前门店的库存，
+     * 管理员切到某家店时会误判成无库存，把别家店有货的商品删掉。
+     */
+    const totalAgg = await this.prisma.stock.groupBy({
+      by: ['productId'],
+      where: { productId: { in: ids } },
+      _sum: { quantity: true },
+    });
+    const totalStockMap = new Map<number, number>();
+    for (const a of totalAgg) {
+      totalStockMap.set(a.productId, a._sum.quantity || 0);
+    }
+
     return paging(total, p, size, rows.map((p) => ({
       id: p.id,
       sku: p.sku,
@@ -86,6 +101,8 @@ export class ProductsController {
         ? `第${p.category.niceClass}类 · ${p.category.groupCode} ${p.category.groupName}`
         : null,
       stock: stockMap.get(p.id)?.quantity ?? null,
+      // 跨门店总库存：判断「能否删除」用这个，不受当前门店筛选影响
+      totalStock: totalStockMap.get(p.id) ?? 0,
       // 档案价（商品管理里维护，入库/销售默认取这两个值）
       salePrice: p.salePrice,
       costPrice: p.costPrice,
@@ -101,10 +118,18 @@ export class ProductsController {
   @Get('check-sku')
   async checkSku(@Query('sku') sku?: string, @Query('excludeId') excludeId?: string) {
     if (!sku) return { exists: false };
+    // 格式不合法时直接返回原因（不抛异常，前端要就地展示提示）
+    if (/^\d{13}$/.test(sku.trim())) {
+      return {
+        exists: false,
+        valid: false,
+        reason: '货号不能是 13 位纯数字（会与商品条码混淆导致扫错货），请用带字母的编号，如 DY001',
+      };
+    }
     const where: any = { sku };
     if (excludeId) where.NOT = { id: +excludeId };
     const found = await this.prisma.product.findFirst({ where });
-    return { exists: !!found, product: found ? { id: found.id, sku: found.sku, name: found.name } : null };
+    return { exists: !!found, valid: true, product: found ? { id: found.id, sku: found.sku, name: found.name } : null };
   }
 
   /** 生成一个库内未被占用的 EAN-13 条码（新增商品时预填） */
@@ -138,6 +163,24 @@ export class ProductsController {
       if (!exist) return code;
     }
     throw new BadRequestException('条码生成失败，请重试');
+  }
+
+  /**
+   * 货号格式校验：不能是 13 位纯数字。
+   *
+   * 原因：扫码接口的匹配顺序是「先按货号精确匹配 → 再按条码匹配」。
+   * 如果某个商品的货号正好是 13 位数字（长得像 EAN-13 条码），
+   * 扫这个条码时会先命中「货号」那个商品，而不是条码真正对应的商品，
+   * 造成串货。货号带上字母前缀（如 DY001）就没这个问题。
+   */
+  private validateSku(sku: string) {
+    const code = String(sku ?? '').trim();
+    if (!code) throw new BadRequestException('货号不能为空');
+    if (/^\d{13}$/.test(code)) {
+      throw new BadRequestException(
+        '货号不能是 13 位纯数字（会与商品条码混淆导致扫错货），请用带字母的编号，如 DY001',
+      );
+    }
   }
 
   /** 价格字段规范化：undefined=不改；null/空串=清空；其他必须是非负数字 */
@@ -217,6 +260,7 @@ export class ProductsController {
     },
   ) {
     if (!body.sku || !body.name) throw new BadRequestException('货号和品名不能为空');
+    this.validateSku(body.sku);
     const exist = await this.prisma.product.findUnique({ where: { sku: body.sku } });
     if (exist) throw new BadRequestException(`货号 ${body.sku} 已存在，请勿重复添加`);
     // 条码留空则自动生成一条库内唯一的 EAN-13
@@ -258,6 +302,7 @@ export class ProductsController {
     if (costPrice !== undefined) body.costPrice = costPrice as any;
     if (salePrice !== undefined) body.salePrice = salePrice as any;
     if (body.sku) {
+      this.validateSku(body.sku);
       const exist = await this.prisma.product.findFirst({
         where: { sku: body.sku, NOT: { id: +id } },
       });
@@ -273,10 +318,21 @@ export class ProductsController {
   @Guard(PERM.PRODUCT_CREATE)
   @Delete(':id')
   async remove(@Param('id') id: string) {
-    const used = await this.prisma.stockBatch.count({ where: { productId: +id } });
-    if (used > 0) throw new BadRequestException('该商品已有入库记录，不能删除');
-    await this.prisma.stock.deleteMany({ where: { productId: +id } });
-    return this.prisma.product.delete({ where: { id: +id } });
+    const pid = +id;
+    // 有库存的商品不能删：先把货卖完/出库完再删，否则库存会变成没有归属的孤儿数据
+    const stockSum = await this.prisma.stock.aggregate({
+      where: { productId: pid },
+      _sum: { quantity: true },
+    });
+    if ((stockSum._sum.quantity || 0) > 0) {
+      throw new BadRequestException(
+        `该商品在系统内还有 ${stockSum._sum.quantity} 件库存，请先清空库存再删除`,
+      );
+    }
+    const used = await this.prisma.stockBatch.count({ where: { productId: pid } });
+    if (used > 0) throw new BadRequestException('该商品已有出入库记录，不能删除');
+    await this.prisma.stock.deleteMany({ where: { productId: pid } });
+    return this.prisma.product.delete({ where: { id: pid } });
   }
 
   /** 商品图片上传 */

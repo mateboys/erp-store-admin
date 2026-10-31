@@ -33,6 +33,7 @@ const TEXT_FIELDS = {
   Product: ['image', 'remark'],
   Order: ['remark'],
   SalesReturn: ['remark'],
+  StockBatch: ['relatedStoreName', 'liablePerson', 'remark'],
 }
 
 const args = process.argv.slice(2)

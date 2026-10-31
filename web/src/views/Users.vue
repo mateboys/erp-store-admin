@@ -72,10 +72,42 @@
           <template #default="{ row }">
             <el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button>
             <el-button link type="warning" @click="openReset(row)">重置密码</el-button>
-            <el-button link :type="row.status === 'ACTIVE' ? 'info' : 'success'" @click="toggle(row)">
-              {{ row.status === 'ACTIVE' ? '停用' : '启用' }}
-            </el-button>
-            <el-button link type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
+            <!-- 内置 admin 账号：不能停用、不能删除，按钮置灰 -->
+            <el-tooltip
+              :disabled="!isRootAdmin(row)"
+              content="admin 是系统内置账号，不能停用"
+              placement="top"
+              :teleported="false"
+            >
+              <span>
+                <el-button
+                  link
+                  :type="row.status === 'ACTIVE' ? 'info' : 'success'"
+                  :disabled="isRootAdmin(row)"
+                  @click="toggle(row)"
+                >
+                  {{ row.status === 'ACTIVE' ? '停用' : '启用' }}
+                </el-button>
+              </span>
+            </el-tooltip>
+            <el-tooltip
+              :disabled="!isRootAdmin(row)"
+              content="admin 是系统内置账号，不能删除"
+              placement="top"
+              :teleported="false"
+            >
+              <span>
+                <el-button
+                  link
+                  type="danger"
+                  :icon="Delete"
+                  :disabled="isRootAdmin(row)"
+                  @click="remove(row)"
+                >
+                  删除
+                </el-button>
+              </span>
+            </el-tooltip>
           </template>
         </el-table-column>
         </el-table>
@@ -99,7 +131,7 @@
         show-icon
         style="margin-top: 14px"
         title="权限说明"
-        description="管理员拥有全部权限（含成本/毛利查看、货品入库、门店与账号管理、修改任意销售单）；店长、营业员默认可看总览（不含成本/毛利）、商品查看与新增、库存查看、销售记账，并且只能修改自己开的销售单；如需让店长也能「货品入库」「查看成本」或「修改他人销售单」，在编辑中追加授权即可。"
+        description="管理员拥有全部权限（含成本/毛利查看、货品出入库、门店与账号管理、修改任意销售单）；店长、营业员默认可看总览（不含成本/毛利）、商品查看与新增、库存查看、销售记账，并且只能修改自己开的销售单；如需让店长也能「货品出入库」「查看成本」或「修改他人销售单」，在编辑中追加授权即可。"
       />
     </div>
 
@@ -120,11 +152,14 @@
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="角色" required>
-          <el-radio-group v-model="form.role" @change="onRoleChange">
+          <el-radio-group v-model="form.role" :disabled="editingRootAdmin" @change="onRoleChange">
             <el-radio value="ADMIN">管理员</el-radio>
             <el-radio value="MANAGER">店长</el-radio>
             <el-radio value="CLERK">营业员</el-radio>
           </el-radio-group>
+          <div v-if="editingRootAdmin" class="muted" style="font-size: 12px; width: 100%">
+            admin 是系统内置账号，角色不能更改
+          </div>
         </el-form-item>
         <el-form-item v-if="form.role !== 'ADMIN'" label="所属门店" required>
           <el-select v-model="form.storeId" placeholder="选择门店" style="width: 100%">
@@ -143,12 +178,19 @@
           <div class="muted" style="font-size: 12px; width: 100%">
             勾选后该账号将在角色默认权限之上获得对应能力
           </div>
+          <div class="muted" style="font-size: 12px; width: 100%; margin-top: 4px">
+            「货品出入库」需要先勾选「查看成本与毛利」：出入库时要填进货价，
+            没有成本权限就拿不到成本价、进货价只能空着填。取消「查看成本与毛利」会同时取消出入库。
+          </div>
         </el-form-item>
         <el-form-item label="状态">
-          <el-radio-group v-model="form.status">
+          <el-radio-group v-model="form.status" :disabled="editingRootAdmin">
             <el-radio value="ACTIVE">启用</el-radio>
             <el-radio value="DISABLED">停用</el-radio>
           </el-radio-group>
+          <div v-if="editingRootAdmin" class="muted" style="font-size: 12px; width: 100%">
+            admin 是系统内置账号，状态不能停用
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -190,7 +232,30 @@ const form = ref({
   status: 'ACTIVE'
 })
 
-const grantable = computed(() => meta.value.grantable?.[form.value.role] || [])
+/**
+ * 可勾选的追加权限。
+ *
+ * 「货品出入库」依赖「查看成本与毛利」：
+ * 出入库时要填进货价（就是成本），没有成本权限的话扫码接口不会下发成本价，
+ * 进货价只能空着让人手填 —— 授权了也没法用。
+ * 所以只有勾了「查看成本与毛利」，才放出「货品出入库」这个选项。
+ */
+const grantable = computed(() => {
+  const list = meta.value.grantable?.[form.value.role] || []
+  const canSeeCost = form.value.permissions.includes('finance:cost')
+  return list.filter((p) => p !== 'inventory:in' || canSeeCost)
+})
+
+/** 取消「查看成本与毛利」时，自动把依赖它的「货品出入库」一起取消 */
+watch(
+  () => form.value.permissions,
+  (v) => {
+    if (!v.includes('finance:cost') && v.includes('inventory:in')) {
+      form.value.permissions = v.filter((p) => p !== 'inventory:in')
+    }
+  },
+  { deep: true }
+)
 
 const PERM_LABEL = {
   'dashboard:view': '查看经营总览',
@@ -198,8 +263,8 @@ const PERM_LABEL = {
   'product:view': '查看商品',
   'product:create': '新增/编辑商品',
   'stock:view': '查看库存',
-  'inventory:in': '货品入库',
-  'inventory:view': '查看入库记录',
+  'inventory:in': '货品出入库',
+  'inventory:view': '查看出入库记录',
   'sale:create': '销售记账',
   'sale:view': '查看销售记录',
   'sale:edit': '修改自己的销售单',
@@ -259,6 +324,7 @@ function openCreate() {
     permissions: [],
     status: 'ACTIVE'
   }
+  editingRootAdmin.value = false
   visible.value = true
 }
 
@@ -273,6 +339,8 @@ function openEdit(row) {
     permissions: [...(row.permissions || [])],
     status: row.status
   }
+  // 内置 admin 账号：角色和状态锁定，不能改
+  editingRootAdmin.value = isRootAdmin(row)
   visible.value = true
 }
 
@@ -281,6 +349,11 @@ async function submit() {
   if (!form.value.id && !form.value.password) return ElMessage.warning('请填写初始密码')
   if (form.value.role !== 'ADMIN' && !form.value.storeId)
     return ElMessage.warning('请选择所属门店')
+  // 内置 admin 账号：角色与状态不能改（表单已锁，这里再挡一次防绕过）
+  if (editingRootAdmin.value) {
+    if (form.value.role !== 'ADMIN') return ElMessage.warning('admin 是系统内置账号，角色不能更改')
+    if (form.value.status !== 'ACTIVE') return ElMessage.warning('admin 是系统内置账号，不能停用')
+  }
   submitting.value = true
   try {
     const payload = { ...form.value }
@@ -298,7 +371,20 @@ async function submit() {
   }
 }
 
+/**
+ * 是否是内置的 admin 账号。
+ * 只有这个账号受保护：不能删除、不能停用、不能改角色。
+ * 其它管理员账号（role=ADMIN 但用户名不同）不受限制，照常管理。
+ */
+function isRootAdmin(row) {
+  return row?.username === 'admin'
+}
+
+/** 当前编辑的是否是内置 admin（用于锁定角色与状态） */
+const editingRootAdmin = ref(false)
+
 async function toggle(row) {
+  if (isRootAdmin(row)) return ElMessage.warning('admin 是系统内置账号，不能停用')
   const status = row.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
   await userApi.update(row.id, { status })
   ElMessage.success(status === 'ACTIVE' ? '已启用' : '已停用')
@@ -315,6 +401,7 @@ async function openReset(row) {
 }
 
 async function remove(row) {
+  if (isRootAdmin(row)) return ElMessage.warning('admin 是系统内置账号，不能删除')
   await ElMessageBox.confirm(`确认删除账号「${row.username}」？`, '危险操作', { type: 'warning' })
   await userApi.remove(row.id)
   ElMessage.success('已删除')

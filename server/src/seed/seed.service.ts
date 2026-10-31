@@ -114,7 +114,8 @@ export class SeedService implements OnModuleInit {
     for (const store of stores) {
       for (const p of products) {
         const qty = 40 + Math.floor(Math.random() * 60);
-        const cost = p.cost + (Math.random() * 10 - 5);
+        // 成本取两位小数，避免均价被浮点拖出 90.70186515925766 这种长小数
+        const cost = Math.round((p.cost + (Math.random() * 10 - 5)) * 100) / 100;
         await this.prisma.stockBatch.create({
           data: {
             storeId: store.id,
@@ -122,7 +123,9 @@ export class SeedService implements OnModuleInit {
             costPrice: cost,
             salePrice: p.sale,
             quantity: qty + 120,
+            direction: 'IN',
             type: 'MANUAL',
+            totalCost: Math.round(cost * (qty + 120) * 100) / 100,
           },
         });
         const s = await this.prisma.stock.create({

@@ -86,11 +86,10 @@
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column v-if="auth.canSeeCost" label="成本价" width="100" align="right">
+          <el-table-column v-if="auth.canSeeCost" label="标准成本价" width="110" align="right">
             <template #default="{ row }">
-              <!-- 优先显示商品档案里设的成本价，没有再退回库存移动加权均价 -->
+              <!-- 标准成本价 = 商品档案里预设的成本价（入库时进货价的默认值） -->
               <span v-if="row.costPrice != null">¥{{ row.costPrice.toFixed(2) }}</span>
-              <span v-else-if="row.avgCost">¥{{ row.avgCost.toFixed(2) }}</span>
               <span v-else>-</span>
             </template>
           </el-table-column>
@@ -105,7 +104,25 @@
               <el-button link type="primary" :icon="Printer" @click="openPrint([row])">标签</el-button>
               <template v-if="canEdit">
                 <el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button>
-                <el-button link type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
+                <!-- 有库存的商品不能删除：按钮置灰，鼠标悬停说明原因 -->
+                <el-tooltip
+                  :disabled="!hasStock(row)"
+                  :content="`该商品还有 ${row.totalStock} 件库存，请先清空库存再删除`"
+                  placement="top"
+                  :teleported="false"
+                >
+                  <span>
+                    <el-button
+                      link
+                      type="danger"
+                      :icon="Delete"
+                      :disabled="hasStock(row)"
+                      @click="remove(row)"
+                    >
+                      删除
+                    </el-button>
+                  </span>
+                </el-tooltip>
               </template>
             </template>
           </el-table-column>
@@ -206,7 +223,7 @@
             入库与销售都取这个价，入库页不再单独填售价
           </div>
         </el-form-item>
-        <el-form-item v-if="auth.canSeeCost" label="成本价">
+        <el-form-item v-if="auth.canSeeCost" label="标准成本价">
           <el-input-number
             v-model="form.costPrice"
             :min="0"
@@ -217,7 +234,7 @@
             placeholder="如 128"
           />
           <div class="muted" style="font-size: 12px; width: 100%">
-            作为入库时进货价的默认值，可按实际进价现场修改
+            标准成本价：该货号的常规进货水平，作为入库时进货价的默认值，可按实际进价现场修改
           </div>
         </el-form-item>
         <el-form-item label="商品图片">
@@ -357,7 +374,18 @@ function doPrint() {
 }
 
 const rules = {
-  sku: [{ required: true, message: '请输入货号', trigger: 'blur' }],
+  sku: [
+    { required: true, message: '请输入货号', trigger: 'blur' },
+    {
+      // 货号不能是 13 位纯数字：扫码时「先按货号精确匹配、再按条码匹配」，
+      // 纯数字货号会跟商品条码抢匹配，导致扫到别的商品（串货）
+      validator: (_r, v, cb) =>
+        /^\d{13}$/.test(String(v || '').trim())
+          ? cb(new Error('货号不能是 13 位纯数字（会与条码混淆导致扫错货），请用带字母的编号，如 DY001'))
+          : cb(),
+      trigger: 'blur'
+    }
+  ],
   name: [{ required: true, message: '请输入品名', trigger: 'blur' }],
   barcode: [
     {
@@ -444,7 +472,18 @@ async function checkSku() {
     skuTip.value = null
     return
   }
+  // 13 位纯数字货号由表单 rules 统一报错（位置固定、带红框），
+  // 这里不再重复设 skuTip，否则两条提示会叠在一起
+  if (/^\d{13}$/.test(form.value.sku.trim())) {
+    skuTip.value = null
+    return
+  }
   const res = await productApi.checkSku(form.value.sku, form.value.id)
+  // 后端返回格式不合法时带上原因，直接展示
+  if (res.valid === false) {
+    skuTip.value = { color: '#d63031', text: res.reason || '货号格式不正确' }
+    return
+  }
   skuTip.value = res.exists
     ? { color: '#d63031', text: `货号「${form.value.sku}」已存在：${res.product?.name || ''}` }
     : { color: '#00b894', text: '货号可用' }
@@ -518,7 +557,20 @@ async function submit() {
   }
 }
 
+/**
+ * 该商品在系统内是否还有库存（跨门店合计）。
+ * 用 totalStock 而不是当前门店的 stock —— 管理员切到某家门店时，
+ * 只看这家店的库存会误判成「没库存」，把别家店有货的商品删掉。
+ */
+function hasStock(row) {
+  return (row.totalStock ?? 0) > 0
+}
+
 async function remove(row) {
+  // 二次拦截：按钮虽然已置灰，这里再挡一次，防止绕过 UI 直接调接口
+  if (hasStock(row)) {
+    return ElMessage.warning(`该商品还有 ${row.totalStock} 件库存，请先清空库存再删除`)
+  }
   await ElMessageBox.confirm(`确认删除商品「${row.name}」？`, '提示', { type: 'warning' })
   await productApi.remove(row.id)
   ElMessage.success('已删除')

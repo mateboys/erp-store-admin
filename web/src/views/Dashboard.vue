@@ -418,8 +418,8 @@ const trendOption = computed(() => {
           x2: 0,
           y2: 1,
           colorStops: [
-            { offset: 0, color: '#9b8cff' },
-            { offset: 1, color: '#7c6cf0' }
+            { offset: 0, color: '#7ec2ff' },
+            { offset: 1, color: '#3aa0ff' }
           ]
         },
         borderRadius: [3, 3, 0, 0]
@@ -510,8 +510,8 @@ const returnTrendOption = computed(() => {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: '#9b8cff' },
-              { offset: 1, color: '#7c6cf0' }
+              { offset: 0, color: '#7ec2ff' },
+              { offset: 1, color: '#3aa0ff' }
             ]
           },
           borderRadius: [4, 4, 0, 0]
@@ -524,8 +524,8 @@ const returnTrendOption = computed(() => {
         symbolSize: 7,
         yAxisIndex: 1,
         data: t.returnItems || [],
-        itemStyle: { color: '#3aa0ff' },
-        lineStyle: { width: 2, color: '#3aa0ff' }
+        itemStyle: { color: '#7c6cf0' },
+        lineStyle: { width: 2, color: '#7c6cf0' }
       }
     ]
   }

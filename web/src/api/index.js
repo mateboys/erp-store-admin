@@ -46,8 +46,9 @@ export const productApi = {
 }
 
 export const inventoryApi = {
-  scan: (code, storeId) => request.get('/inventory/scan', { params: { code, storeId } }),
+  scan: (code, storeId, action) => request.get('/inventory/scan', { params: { code, storeId, action } }),
   stockIn: (data) => request.post('/inventory/in', data),
+  stockOut: (data) => request.post('/inventory/out', data),
   records: (params) => request.get('/inventory/records', { params }),
   stock: (params) => request.get('/inventory/stock', { params })
 }
@@ -64,7 +65,10 @@ export const dashboardApi = {
   trend: (params) => request.get('/dashboard/trend', { params }),
   byStore: (range) => request.get('/dashboard/by-store', { params: { range } }),
   lowStock: (storeId, limit) =>
-    request.get('/dashboard/low-stock', { params: { storeId, limit } })
+    request.get('/dashboard/low-stock', { params: { storeId, limit } }),
+  /** 个人总览：只统计当前登录用户经手的数据 */
+  personal: (storeId) => request.get('/dashboard/personal', { params: { storeId } }),
+  personalTrend: (params) => request.get('/dashboard/personal-trend', { params })
 }
 
 export const returnApi = {

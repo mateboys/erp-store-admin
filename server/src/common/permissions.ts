@@ -8,8 +8,8 @@ export const PERM = {
   PRODUCT_VIEW: 'product:view',
   PRODUCT_CREATE: 'product:create',
   STOCK_VIEW: 'stock:view',
-  INVENTORY_IN: 'inventory:in', // 货品入库（扫码/手动入库操作）
-  INVENTORY_VIEW: 'inventory:view', // 查看入库记录（只读，不含入库操作）
+  INVENTORY_IN: 'inventory:in', // 货品出入库（入库 + 出库：丢失破损/退供应商/调拔）
+  INVENTORY_VIEW: 'inventory:view', // 查看出入库记录（只读，不含操作）
   SALE_CREATE: 'sale:create',
   SALE_VIEW: 'sale:view',
   SALE_EDIT: 'sale:edit', // 修改销售单（默认只能改自己开的）
@@ -28,6 +28,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   // 店长：总览(不含成本)、商品查看(只读)、库存查看、销售记账
   // 商品档案由管理员统一维护，店长默认不能新增/编辑/删除商品，
   // 需要时可在「账号权限」页单独勾选「新增/编辑商品」追加授权
+  // 出入库操作（inventory:in）默认不开放，需要时单独授权
   MANAGER: [
     PERM.DASHBOARD,
     PERM.PRODUCT_VIEW,

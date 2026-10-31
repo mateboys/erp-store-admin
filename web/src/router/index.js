@@ -15,12 +15,19 @@ const routes = [
         meta: { title: '经营总览', icon: 'DataLine', perm: 'dashboard:view' }
       },
       {
+        // 个人总览：只统计当前登录用户经手的单据
+        path: 'my-dashboard',
+        name: 'my-dashboard',
+        component: () => import('@/views/MyDashboard.vue'),
+        meta: { title: '个人总览', icon: 'User', perm: 'dashboard:view' }
+      },
+      {
         path: 'inventory',
         name: 'inventory',
         component: () => import('@/views/Inventory.vue'),
         // 库存列表 + 入库作业合并进同一页（第 1 个 tab 是库存列表）：
         // stock:view 与 inventory:view 有任意一个就能进来，页面再按权限决定显示哪些 tab；
-        // opPerm=inventory:in：有它才能扫码/手动入库，否则页面只剩库存列表和入库记录
+        // opPerm=inventory:in：有它才能做扫码/手动出入库，否则页面只剩库存列表和出入库记录
         meta: {
           title: '库存管理',
           icon: 'Goods',

@@ -8,6 +8,7 @@
     "start:dev": "nest start --watch",
     "db:push": "prisma db push",
     "prisma:generate": "prisma generate",
+    "init": "node scripts/init.mjs",
     "db:use:sqlite": "node scripts/switch-db.mjs sqlite",
     "db:use:mysql": "node scripts/switch-db.mjs mysql"
   },
